@@ -89,6 +89,12 @@ jobs:
         working-directory: ${{ env.NWJS_DIR }}
         run: gclient sync
 
+      - name: Add cxxflags
+        shell: bash
+        working-directory: ${{ env.SRC_DIR }}
+        run: >
+          sed -i 's/"\/Zc:twoPhase",/&\n"-Xclang",\n"-fno-pch-timestamp",/' build/config/win/BUILD.gn
+
       - name: Generate GN Build Files for NW.js
         working-directory: ${{ env.SRC_DIR }}
         run: >
