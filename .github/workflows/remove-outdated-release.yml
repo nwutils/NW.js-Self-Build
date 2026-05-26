@@ -1,0 +1,46 @@
+name: Remove Outdated Release
+
+on:
+    schedule:
+        - cron: "0 0 * * 0"
+    workflow_dispatch:
+
+jobs:
+    ci:
+        name: Run
+        runs-on: ubuntu-slim
+        permissions:
+            contents: write
+        steps:
+            - name: Run
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  REPOSITORY: ${{ github.repository }}
+                  KEEP_COUNT: 10
+              run: |
+                  set -euo pipefail
+
+                  RELEASE_RAW=$(gh api \
+                    -H "Accept: application/vnd.github+json" \
+                    -H "X-GitHub-Api-Version: 2026-03-10" \
+                    /repos/"$REPOSITORY"/releases)
+
+                  SORTED_RELEASES=$(echo "$RELEASE_RAW" | jq 'sort_by(.published_at | fromdateiso8601) | reverse')
+
+                  TOTAL_COUNT=$(echo "$SORTED_RELEASES" | jq 'length')
+
+                  if [[ $TOTAL_COUNT -le $KEEP_COUNT ]]; then
+                      exit 0
+                  fi
+
+                  DELETE_COUNT=$(( TOTAL_COUNT - KEEP_COUNT ))
+                  TO_DELETE=$(echo "$SORTED_RELEASES" | jq -c ".[$KEEP_COUNT:] | .[]")
+
+                  echo "$TO_DELETE" | while read -r item; do
+                      RELEASE_ID=$(echo "$item" | jq -r '.id')
+                      gh api \
+                          --method DELETE \
+                          -H "Accept: application/vnd.github+json" \
+                          -H "X-GitHub-Api-Version: 2026-03-10" \
+                          /repos/"$REPOSITORY"/releases/"$RELEASE_ID"
+                  done
